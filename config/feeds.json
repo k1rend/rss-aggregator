@@ -1,0 +1,5 @@
+[
+  { "url": "https://lenta.ru/rss/", "title": "lenta ru", "type": "country" },
+  { "url": "https://72.ru/rss-feeds/rss.xml", "title": "72 ru", "type": "local" },
+  { "url": "https://www.rt.com/rss/", "title": "rt", "type": "world" }
+]

@@ -1,0 +1,520 @@
+openapi: 3.0.3
+info:
+  title: RSS Aggregator API
+  version: 1.0.0
+  description: |
+    Server side of an RSS aggregator built with Express, SQLite and Redis.
+
+    * Feeds are loaded from `config/feeds.json` on startup and refreshed periodically.
+    * Reading articles requires a bearer token from `/api/auth/signup` or `/api/auth/signin`.
+    * Viewing history is stored in Redis as a sorted set `user:<user_id>:history`,
+      score = view timestamp (unix seconds), member = article id.
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+tags:
+  - name: Service
+    description: Health and API description endpoints
+  - name: Auth
+    description: User registration and login
+  - name: Feeds
+    description: RSS feeds loaded from the config file
+  - name: Articles
+    description: Aggregated articles and view tracking
+  - name: History
+    description: Per-user viewing history stored in Redis
+paths:
+  /health:
+    get:
+      tags: [Service]
+      summary: Service health
+      description: Reports server status and Redis connectivity.
+      security: []
+      responses:
+        '200':
+          description: Service status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /openapi.json:
+    get:
+      tags: [Service]
+      summary: This OpenAPI document
+      security: []
+      responses:
+        '200':
+          description: OpenAPI document as JSON
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/auth/signup:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: Creates a user and returns a JWT usable for protected endpoints.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Credentials'
+            example:
+              login: alice
+              password: secret123
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Missing or invalid login/password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Login already taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/signin:
+    post:
+      tags: [Auth]
+      summary: Sign in an existing user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Credentials'
+            example:
+              login: alice
+              password: secret123
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Missing login/password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid login or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/feeds:
+    get:
+      tags: [Feeds]
+      summary: List feeds
+      description: Returns every feed from the database together with its article count.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of feeds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Feed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/feeds/{id}:
+    get:
+      tags: [Feeds]
+      summary: Get a single feed
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Feed details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Feed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/articles:
+    get:
+      tags: [Articles]
+      summary: List articles
+      description: |
+        Paginated list of articles, newest first by default. Each article carries a
+        `viewed` flag based on the current user's Redis history. Use
+        `only_unviewed=true` to get only articles the user has not viewed yet
+        (`total` then reflects the filtered count).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: feed_id
+          in: query
+          description: Filter by feed id
+          schema:
+            type: integer
+            minimum: 1
+        - name: type
+          in: query
+          description: Filter by feed type
+          schema:
+            type: string
+            enum: [local, country, world]
+        - name: limit
+          in: query
+          description: Page size (1-100, default 20)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          description: Number of articles to skip
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: order
+          in: query
+          description: Sort direction by publication date
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: only_unviewed
+          in: query
+          description: Return only articles that are not in the user's history
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Paginated articles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/articles/{id}:
+    get:
+      tags: [Articles]
+      summary: Get a single article
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ArticleId'
+      responses:
+        '200':
+          description: Article details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Article'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/articles/{id}/view:
+    post:
+      tags: [Articles]
+      summary: Mark an article as viewed
+      description: |
+        Adds the article id to the user's Redis sorted set `user:<user_id>:history`
+        with the current unix timestamp as score. Repeated calls update the
+        timestamp without creating duplicates.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ArticleId'
+      responses:
+        '200':
+          description: Article marked as viewed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ViewResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/history:
+    get:
+      tags: [History]
+      summary: List viewed articles
+      description: |
+        Returns the user's viewing history from Redis, oldest view first.
+        With `details=true` (default) each item also contains the full article.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          description: Start index in the sorted set (inclusive)
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: to
+          in: query
+          description: End index in the sorted set (inclusive, -1 = last)
+          schema:
+            type: integer
+            default: -1
+        - name: details
+          in: query
+          description: Include article details; `false` returns ids and timestamps only
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Viewing history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/History'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ArticleId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  responses:
+    Unauthorized:
+      description: Missing, invalid or expired token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Health:
+      type: object
+      required: [status, redis]
+      properties:
+        status:
+          type: string
+          example: ok
+        redis:
+          type: string
+          enum: [up, down]
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: Article not found
+    Credentials:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+          pattern: '^[a-zA-Z0-9_.-]{3,32}$'
+          example: alice
+        password:
+          type: string
+          minLength: 6
+          format: password
+          example: secret123
+    User:
+      type: object
+      required: [id, login]
+      properties:
+        id:
+          type: integer
+          example: 1
+        login:
+          type: string
+          example: alice
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          description: JWT bearer token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        user:
+          $ref: '#/components/schemas/User'
+    Feed:
+      type: object
+      required: [id, url, title, type, article_count]
+      properties:
+        id:
+          type: integer
+          example: 1
+        url:
+          type: string
+          format: uri
+          example: https://feeds.bbci.co.uk/news/world/rss.xml
+        title:
+          type: string
+          example: BBC World
+        type:
+          type: string
+          enum: [local, country, world]
+        article_count:
+          type: integer
+          example: 42
+    Article:
+      type: object
+      required: [id, feed_id, title, link, pub_date, content, feed_title, feed_type, viewed]
+      properties:
+        id:
+          type: integer
+          example: 10
+        feed_id:
+          type: integer
+          example: 1
+        feed_title:
+          type: string
+          example: BBC World
+        feed_type:
+          type: string
+          enum: [local, country, world]
+        title:
+          type: string
+          example: Example headline
+        link:
+          type: string
+          format: uri
+          example: https://www.bbc.co.uk/news/articles/example
+        pub_date:
+          type: string
+          format: date-time
+          example: '2026-11-11T08:00:00.000Z'
+        content:
+          type: string
+          nullable: true
+        viewed:
+          type: boolean
+          description: Whether this article is in the current user's history
+    ArticleList:
+      type: object
+      required: [total, limit, offset, articles]
+      properties:
+        total:
+          type: integer
+          description: Articles matching the filters, ignoring pagination
+          example: 42
+        limit:
+          type: integer
+          example: 20
+        offset:
+          type: integer
+          example: 0
+        articles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Article'
+    ViewResponse:
+      type: object
+      required: [ok, article_id, viewed_at]
+      properties:
+        ok:
+          type: boolean
+          example: true
+        article_id:
+          type: integer
+          example: 10
+        viewed_at:
+          type: string
+          format: date-time
+          example: '2026-11-11T09:15:00.000Z'
+    HistoryItem:
+      type: object
+      required: [articleId, viewedAt]
+      properties:
+        articleId:
+          type: integer
+          example: 10
+        viewedAt:
+          type: integer
+          description: View timestamp in milliseconds since epoch
+          example: 1762852500000
+        id:
+          type: integer
+          description: Article id (present when details are included)
+          example: 10
+        feed_id:
+          type: integer
+          example: 1
+        feed_title:
+          type: string
+          example: BBC World
+        feed_type:
+          type: string
+          enum: [local, country, world]
+        title:
+          type: string
+          example: Example headline
+        link:
+          type: string
+          format: uri
+          example: https://www.bbc.co.uk/news/articles/example
+        pub_date:
+          type: string
+          format: date-time
+          example: '2026-11-11T08:00:00.000Z'
+        content:
+          type: string
+          nullable: true
+        viewed_at:
+          type: string
+          format: date-time
+          description: View timestamp in ISO format (present when details are included)
+    History:
+      type: object
+      required: [count, items]
+      properties:
+        count:
+          type: integer
+          example: 2
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoryItem'
+
+
+
