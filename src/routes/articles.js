@@ -48,7 +48,7 @@ router.get('/:id', requireAuth, async (req, res) => {
   res.json({ ...article, viewed: viewedSet.has(article.id) });
 });
 
-// POST /api/articles/:id/view — mark as viewed
+// POST /api/articles/:id/view mark as viewed
 router.post('/:id/view', requireAuth, async (req, res) => {
   const article = articleStmt.byId.get(req.params.id);
   if (!article) return res.status(404).json({ error: 'Article not found' });

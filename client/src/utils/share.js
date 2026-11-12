@@ -1,8 +1,4 @@
-/**
- * Copies text to the clipboard.
- * Uses the async Clipboard API when available and falls back to a hidden
- * textarea + execCommand for non-secure contexts (plain http:// intranet hosts).
- */
+
 export async function copyToClipboard(text) {
   if (!text) throw new Error('Nothing to copy');
 

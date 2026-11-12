@@ -1,8 +1,7 @@
 [
   { "url": "https://rss.slashdot.org/Slashdot/slashdotMain", "title": "slashdot.org", "type": "local" },
   { "url": "https://www.theguardian.com/us/technology/rss", "title": "theguardian.com", "type": "local" },
-  { "url": "https://www.finam.ru/international/advanced/rsspoint/", "title": "finam.ru/international", "type": "country" },
-  { "url": "https://www.finam.ru/analysis/forecasts/rsspoint/", "title": "finam.ru/forecasts", "type": "country" },
+  { "url": "https://www.finam.ru/international/advanced/rsspoint/", "title": "finam.ru", "type": "country" },
   { "url": "https://www.rt.com/rss/", "title": "rt.com", "type": "world" },
   { "url": "https://english.pravda.ru/export.xml", "title": "pravda.ru", "type": "world" }
 ]

@@ -16,8 +16,6 @@ function readStoredUser() {
   }
 }
 
-// Session state lives in a module-level reactive object so every component sees
-// the same token/user without pulling in an extra state library.
 const state = reactive({
   token: localStorage.getItem(TOKEN_STORAGE_KEY) || '',
   user: readStoredUser(),
@@ -64,6 +62,4 @@ export const auth = {
   logout: clearSession,
 };
 
-// An expired token makes the API answer 401 -> drop the session, App.vue then
-// sends the user back to the auth screen.
 onUnauthorized(clearSession);

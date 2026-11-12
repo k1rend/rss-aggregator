@@ -94,7 +94,7 @@ async function submit() {
             type="text"
             name="login"
             autocomplete="username"
-            placeholder="alice"
+            placeholder="login"
             required
           />
         </label>

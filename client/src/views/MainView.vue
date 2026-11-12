@@ -57,7 +57,6 @@ async function loadFeeds() {
   feedsError.value = '';
   try {
     feeds.value = await fetchFeeds();
-    // Drop a selection whose feed disappeared from the server.
     if (selectedFeedId.value && !feeds.value.some((feed) => feed.id === selectedFeedId.value)) {
       selectedFeedId.value = null;
     }
@@ -112,10 +111,10 @@ async function loadMoreArticles() {
   }
 }
 
-/** Expanding an article marks it as read and stores the view in Redis history. */
+// Expanding an article marks it as read and stores the view in Redis history.
 async function handleView(article) {
   if (article.viewed) return;
-  article.viewed = true; // optimistic update -> the dot turns gray immediately
+  article.viewed = true; // optimistic update
   try {
     await markArticleViewed(article.id);
   } catch (error) {

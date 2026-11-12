@@ -4,8 +4,7 @@ export const TOKEN_STORAGE_KEY = 'rss-aggregator.token';
 export const USER_STORAGE_KEY = 'rss-aggregator.user';
 
 // Empty base URL -> requests stay on the current origin and are proxied by Vite
-// to the Express server (see vite.config.js). Set VITE_API_BASE_URL to talk to
-// a different host directly.
+// to the Express server (in vite.config.js).
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const http = axios.create({
@@ -24,7 +23,6 @@ http.interceptors.request.use((config) => {
 
 let unauthorizedHandler = null;
 
-/** Registers the callback invoked when the API answers 401 (expired/invalid token). */
 export function onUnauthorized(handler) {
   unauthorizedHandler = handler;
 }
@@ -39,7 +37,6 @@ http.interceptors.response.use(
   }
 );
 
-/** Extracts the `{ error }` message the server sends for 4xx/5xx responses. */
 export function apiErrorMessage(error, fallback = 'Something went wrong. Please try again.') {
   return error?.response?.data?.error || error?.message || fallback;
 }

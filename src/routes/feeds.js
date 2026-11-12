@@ -4,7 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /api/feeds — list all feeds with article counts
+// GET /api/feeds list all feeds with article counts
 router.get('/', requireAuth, (req, res) => {
   const feeds = feedStmt.all();
   const countStmt = require('../db').db.prepare('SELECT feed_id, COUNT(*) AS n FROM Articles GROUP BY feed_id');
@@ -12,7 +12,7 @@ router.get('/', requireAuth, (req, res) => {
   res.json(feeds.map((f) => ({ ...f, article_count: counts.get(f.id) || 0 })));
 });
 
-// GET /api/feeds/:id — feed details
+// GET /api/feeds/:id feed details
 router.get('/:id', requireAuth, (req, res) => {
   const feed = feedStmt.byId.get(req.params.id);
   if (!feed) return res.status(404).json({ error: 'Feed not found' });

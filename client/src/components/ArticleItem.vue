@@ -11,14 +11,12 @@ const props = defineProps({
 const emit = defineEmits(['view']);
 
 const expanded = ref(false);
-const shareState = ref('idle'); // idle | copied | error
+const shareState = ref('idle'); // idle / copied / error
 const shareError = ref('');
 let shareResetTimer = null;
 
 const isRead = computed(() => Boolean(props.article.viewed));
 
-// Feed content is arbitrary HTML from third-party RSS sources, so it is
-// sanitized before being rendered with v-html.
 const safeContent = computed(() =>
   DOMPurify.sanitize(props.article.content || '', { USE_PROFILES: { html: true } })
 );
@@ -29,8 +27,6 @@ const hasContent = computed(
 
 function toggle() {
   expanded.value = !expanded.value;
-  // Expanding an unread article marks it as read. The parent owns the API call
-  // so it can update the shared list state optimistically.
   if (expanded.value && !isRead.value) {
     emit('view', props.article);
   }

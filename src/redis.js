@@ -54,8 +54,6 @@ async function getViewedArticleDetails(userId, from = 0, to = -1) {
      WHERE a.id IN (${ids.map(() => '?').join(',')})`
   ).all(...ids);
   const byId = new Map(rows.map((r) => [r.id, r]));
-  // Articles can disappear (feed cleanup / re-import), so skip unknown ids
-  // instead of returning empty objects.
   const out = [];
   for (const v of viewed) {
     const row = byId.get(v.articleId);

@@ -12,13 +12,13 @@ const historyRoutes = require('./routes/history');
 const app = express();
 app.use(express.json());
 
-// --- Swagger / OpenAPI docs ---
+// OpenAPI
 const openapiPath = path.join(__dirname, '..', 'openapi.yaml');
 const openapiDoc = YAML.parse(fs.readFileSync(openapiPath, 'utf8'));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiDoc));
 app.get('/openapi.json', (req, res) => res.json(openapiDoc));
 
-// --- Health / readiness ---
+// Health
 app.get('/health', async (req, res) => {
   const { redis } = require('./redis');
   let redisOk = true;
@@ -26,7 +26,7 @@ app.get('/health', async (req, res) => {
   res.json({ status: 'ok', redis: redisOk ? 'up' : 'down' });
 });
 
-// --- API routes ---
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/feeds', feedRoutes);
 app.use('/api/articles', articleRoutes);

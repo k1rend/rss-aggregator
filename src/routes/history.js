@@ -4,10 +4,8 @@ const { getViewedArticleDetails, getViewedIds } = require('../redis');
 
 const router = express.Router();
 
-// GET /api/history — list of viewed articles with view timestamps (oldest first)
+// GET /api/history list of viewed articles with view timestamps (oldest first)
 router.get('/', requireAuth, async (req, res) => {
-  // Note: `from=0`/`to=0` are valid indexes, so a plain `parseInt(...) || fallback`
-  // would wrongly turn `to=0` into `-1` (the whole set).
   const parseIndex = (value, fallback) => {
     const parsed = parseInt(value, 10);
     return Number.isInteger(parsed) ? parsed : fallback;

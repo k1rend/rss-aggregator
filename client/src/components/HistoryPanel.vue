@@ -11,8 +11,7 @@ const items = ref([]);
 const loading = ref(false);
 const error = ref('');
 
-// The API returns the sorted set oldest first; show the last read article on top.
-// History rows are read by definition, so `viewed` is forced to true.
+
 const history = computed(() =>
   items.value
     .slice()

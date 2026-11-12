@@ -3,7 +3,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
   timeStyle: 'short',
 });
 
-/** Formats an ISO date string (server returns ISO-8601) for display. */
+// Formats an ISO date string (server returns ISO-8601) for display. 
 export function formatDate(value) {
   if (!value) return '';
   const date = new Date(value);

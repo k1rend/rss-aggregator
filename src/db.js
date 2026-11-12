@@ -4,8 +4,6 @@ const Database = require('better-sqlite3');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'aggregator.db');
 
-// Make sure the parent directory exists before opening the database file,
-// otherwise better-sqlite3 throws SQLITE_CANTOPEN on a fresh checkout.
 fs.mkdirSync(path.dirname(path.resolve(DB_PATH)), { recursive: true });
 
 const db = new Database(DB_PATH);
